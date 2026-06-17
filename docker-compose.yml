@@ -1,0 +1,122 @@
+# 3 Cassandra nodes (RF=3, one DC) + 3 stateless FastAPI apps + Nginx LB.
+# Each app gets all three nodes as contact points, so it survives losing one.
+
+x-cassandra-env: &cassandra-env
+  CASSANDRA_CLUSTER_NAME: "train-cluster"
+  CASSANDRA_ENDPOINT_SNITCH: "GossipingPropertyFileSnitch"
+  CASSANDRA_DC: "datacenter1"          # MUST match schema.cql + app local_dc
+  CASSANDRA_RACK: "rack1"
+  CASSANDRA_SEEDS: "cassandra-1"
+  MAX_HEAP_SIZE: "512M"   # capped so three JVMs fit on a laptop
+  HEAP_NEWSIZE: "100M"
+
+x-cassandra-healthcheck: &cassandra-healthcheck
+  # Usable only once CQL is up and the node reports itself Up/Normal (UN).
+  test: ["CMD-SHELL", "nodetool status | grep -E '^UN\\s' >/dev/null && cqlsh -e 'describe cluster' >/dev/null 2>&1"]
+  interval: 15s
+  timeout: 10s
+  retries: 20
+  start_period: 90s
+
+services:
+  cassandra-1:
+    image: cassandra:4.1
+    container_name: cassandra-1
+    environment: *cassandra-env
+    healthcheck: *cassandra-healthcheck
+    volumes:
+      - cassandra-1-data:/var/lib/cassandra
+    ports:
+      - "9042:9042"
+    networks: [trainnet]
+
+  cassandra-2:
+    image: cassandra:4.1
+    container_name: cassandra-2
+    environment: *cassandra-env
+    healthcheck: *cassandra-healthcheck
+    volumes:
+      - cassandra-2-data:/var/lib/cassandra
+    networks: [trainnet]
+    depends_on:
+      cassandra-1:
+        condition: service_healthy
+
+  cassandra-3:
+    image: cassandra:4.1
+    container_name: cassandra-3
+    environment: *cassandra-env
+    healthcheck: *cassandra-healthcheck
+    volumes:
+      - cassandra-3-data:/var/lib/cassandra
+    networks: [trainnet]
+    depends_on:
+      cassandra-2:
+        condition: service_healthy
+
+  # One-shot: waits for the cluster, loads schema.cql, exits 0.
+  schema-loader:
+    image: cassandra:4.1
+    container_name: schema-loader
+    networks: [trainnet]
+    depends_on:
+      cassandra-3:
+        condition: service_healthy
+    volumes:
+      - ./schema.cql:/schema.cql:ro
+    command: ["cqlsh", "cassandra-1", "-f", "/schema.cql"]
+    restart: "no"
+
+  app-1: &app
+    build: ./app
+    environment:
+      CASSANDRA_CONTACT_POINTS: "cassandra-1,cassandra-2,cassandra-3"
+      CASSANDRA_LOCAL_DC: "datacenter1"
+      CASSANDRA_KEYSPACE: "train_booking"
+      INSTANCE_NAME: "app-1"
+    ports:
+      - "8001:8000"
+    networks: [trainnet]
+    depends_on:
+      schema-loader:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  app-2:
+    <<: *app
+    environment:
+      CASSANDRA_CONTACT_POINTS: "cassandra-1,cassandra-2,cassandra-3"
+      CASSANDRA_LOCAL_DC: "datacenter1"
+      CASSANDRA_KEYSPACE: "train_booking"
+      INSTANCE_NAME: "app-2"
+    ports:
+      - "8002:8000"
+
+  app-3:
+    <<: *app
+    environment:
+      CASSANDRA_CONTACT_POINTS: "cassandra-1,cassandra-2,cassandra-3"
+      CASSANDRA_LOCAL_DC: "datacenter1"
+      CASSANDRA_KEYSPACE: "train_booking"
+      INSTANCE_NAME: "app-3"
+    ports:
+      - "8003:8000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8000:8000"
+    networks: [trainnet]
+    depends_on: [app-1, app-2, app-3]
+
+networks:
+  trainnet:
+    driver: bridge
+
+volumes:
+  cassandra-1-data:
+  cassandra-2-data:
+  cassandra-3-data:

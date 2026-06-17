@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PKP Booking</title>
+    <style>
+      :root {
+        --bg: #0e1116;
+        --panel: #161b22;
+        --panel-2: #1c232d;
+        --border: #2a323d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #2f81f7;
+        --free: #2ea043;
+        --free-bg: #16331f;
+        --booked: #f85149;
+        --booked-bg: #3a1a1a;
+        --sel: #2f81f7;
+        --sel-bg: #16263f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.9rem 1.4rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+      header h1 {
+        font-size: 1.15rem;
+        margin: 0;
+        font-weight: 600;
+      }
+      header .spacer {
+        flex: 1;
+      }
+      header a {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.9rem;
+      }
+      header a:hover {
+        text-decoration: underline;
+      }
+      .instance {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--free);
+        margin-right: 0.35rem;
+        vertical-align: middle;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr 340px;
+        gap: 1.2rem;
+        padding: 1.2rem 1.4rem;
+        align-items: start;
+      }
+      @media (max-width: 1000px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      .panel h2 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 0 0 0.8rem;
+        font-weight: 600;
+      }
+
+      /* Departure list */
+      .dep {
+        padding: 0.7rem 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        margin-bottom: 0.55rem;
+        cursor: pointer;
+        transition: 0.12s;
+      }
+      .dep:hover {
+        border-color: var(--accent);
+      }
+      .dep.active {
+        border-color: var(--accent);
+        background: var(--sel-bg);
+      }
+      .dep .route {
+        font-weight: 600;
+        font-size: 0.92rem;
+      }
+      .dep .meta {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.2rem;
+      }
+
+      /* Wagon */
+      .wagon-head {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .wagon-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+      }
+      .legend {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-left: auto;
+      }
+      .legend i {
+        display: inline-block;
+        width: 13px;
+        height: 13px;
+        border-radius: 4px;
+        margin-right: 0.35rem;
+        vertical-align: -2px;
+        border: 1px solid var(--border);
+      }
+      .wagon {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.1rem 1.3rem;
+        max-width: 420px;
+        margin: 0 auto;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        margin-bottom: 0.4rem;
+      }
+      .rownum {
+        width: 22px;
+        text-align: right;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .aisle {
+        width: 18px;
+      }
+      .seat {
+        width: 42px;
+        height: 38px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: 0.1s;
+        user-select: none;
+      }
+      .seat.free {
+        background: var(--free-bg);
+        border-color: #245c33;
+        color: #7ee08f;
+      }
+      .seat.free:hover {
+        border-color: var(--free);
+      }
+      .seat.booked {
+        background: var(--booked-bg);
+        border-color: #6e2b2b;
+        color: #ff8a83;
+      }
+      .seat.booked:hover {
+        border-color: var(--booked);
+      }
+      .seat.selected {
+        background: var(--sel-bg);
+        border-color: var(--sel);
+        color: #9ec5ff;
+        box-shadow: 0 0 0 2px rgba(47, 129, 247, 0.4);
+      }
+      .seat.editing {
+        box-shadow: 0 0 0 2px var(--booked);
+      }
+
+      /* Side panel */
+      .side .empty {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-bottom: 0.8rem;
+      }
+      .chip {
+        background: var(--sel-bg);
+        border: 1px solid var(--sel);
+        color: #9ec5ff;
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.8rem;
+      }
+      label.field {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin: 0.6rem 0 0.25rem;
+      }
+      input[type="text"],
+      input[type="email"] {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border-radius: 8px;
+        font: inherit;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        margin-top: 0.9rem;
+        width: 100%;
+      }
+      button:hover {
+        filter: brightness(1.08);
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 0.9rem;
+        font-size: 0.82rem;
+      }
+      .result .ok {
+        color: var(--free);
+      }
+      .result .bad {
+        color: var(--booked);
+      }
+      .holder {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .holder b {
+        color: var(--text);
+      }
+      .summary {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 0.6rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PKP Booking System</h1>
+      <a href="/tests">Stress-test runner →</a>
+      <span class="spacer"></span>
+      <span class="instance"
+        ><span class="dot"></span><span id="instance">…</span></span
+      >
+    </header>
+
+    <div class="layout">
+      <!-- Departures -->
+      <aside class="panel">
+        <h2>Departures from Poznań</h2>
+        <div id="deps"></div>
+      </aside>
+
+      <!-- Wagon -->
+      <main class="panel">
+        <div class="wagon-head">
+          <div class="wagon-title" id="wagonTitle">Select a departure</div>
+          <div class="legend">
+            <span
+              ><i style="background: var(--free-bg); border-color: #245c33"></i
+              >free</span
+            >
+            <span
+              ><i
+                style="background: var(--sel-bg); border-color: var(--sel)"
+              ></i
+              >selected</span
+            >
+            <span
+              ><i
+                style="background: var(--booked-bg); border-color: #6e2b2b"
+              ></i
+              >booked</span
+            >
+          </div>
+        </div>
+        <div id="wagon"></div>
+      </main>
+
+      <!-- Side panel: booking OR edit -->
+      <aside class="panel side" id="side">
+        <h2>Booking</h2>
+        <p class="empty">
+          Pick a departure, then tap free seats to select them.
+        </p>
+      </aside>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      // Stable per-browser identity so "edit only your booking" works in the demo.
+      const ME =
+        localStorage.getItem("me") ||
+        (() => {
+          const id = "user-" + Math.random().toString(36).slice(2, 8);
+          localStorage.setItem("me", id);
+          return id;
+        })();
+
+      const state = {
+        departures: [],
+        current: null,
+        meta: null,
+        seats: [],
+        selected: new Set(),
+        editing: null,
+      };
+
+      async function api(method, path, body) {
+        const opt = { method, headers: { "Content-Type": "application/json" } };
+        if (body) opt.body = JSON.stringify(body);
+        const r = await fetch(path, opt);
+        return {
+          ok: r.ok,
+          status: r.status,
+          data: await r.json().catch(() => ({})),
+        };
+      }
+
+      async function init() {
+        const h = await api("GET", "/health");
+        $("instance").textContent = "served by " + (h.data.instance || "?");
+        const r = await api("GET", "/departures");
+        state.departures = r.data.departures || [];
+        renderDepartures();
+      }
+
+      function renderDepartures() {
+        const box = $("deps");
+        box.innerHTML = "";
+        for (const d of state.departures) {
+          const el = document.createElement("div");
+          el.className =
+            "dep" + (state.current === d.departure_id ? " active" : "");
+          el.innerHTML = `<div class="route">${d.origin.replace(" Główny", "")} → ${d.destination}</div>
+                        <div class="meta">${d.train} · ${d.departs}</div>`;
+          el.onclick = () => selectDeparture(d);
+          box.appendChild(el);
+        }
+      }
+
+      async function selectDeparture(d) {
+        state.current = d.departure_id;
+        state.meta = d;
+        state.selected.clear();
+        state.editing = null;
+        renderDepartures();
+        await loadSeats();
+        renderSide();
+      }
+
+      async function loadSeats() {
+        const r = await api(
+          "GET",
+          `/departures/${encodeURIComponent(state.current)}/seats`,
+        );
+        state.seats = r.ok ? r.data.seats : [];
+        renderWagon(r.ok ? r.data : null);
+      }
+
+      function seatKey(s) {
+        return `${s.coach}/${s.seat_number}`;
+      }
+
+      function renderWagon(data) {
+        const d = state.meta;
+        $("wagonTitle").textContent =
+          `${d.origin.replace(" Główny", "")} → ${d.destination}  ·  ${d.train}` +
+          (data ? `  ·  ${data.free}/${data.total} free` : "");
+        const wagon = $("wagon");
+        wagon.innerHTML = "";
+        if (!state.seats.length) {
+          wagon.innerHTML = `<p class="empty">No seats.</p>`;
+          return;
+        }
+
+        const perRow = d.seats_per_row;
+        const aisleAfter = Math.floor(perRow / 2); // gap in the middle (2 | 2)
+        const byRow = {};
+        for (const s of state.seats) {
+          const row = parseInt(s.seat_number);
+          (byRow[row] ||= []).push(s);
+        }
+        const container = document.createElement("div");
+        container.className = "wagon";
+        Object.keys(byRow)
+          .sort((a, b) => a - b)
+          .forEach((rowNum) => {
+            const rowEl = document.createElement("div");
+            rowEl.className = "row";
+            const num = document.createElement("div");
+            num.className = "rownum";
+            num.textContent = rowNum;
+            rowEl.appendChild(num);
+            byRow[rowNum]
+              .sort((a, b) => a.seat_number.localeCompare(b.seat_number))
+              .forEach((s, i) => {
+                if (i === aisleAfter) {
+                  const aisle = document.createElement("div");
+                  aisle.className = "aisle";
+                  rowEl.appendChild(aisle);
+                }
+                rowEl.appendChild(seatEl(s));
+              });
+            container.appendChild(rowEl);
+          });
+        wagon.appendChild(container);
+      }
+
+      function seatEl(s) {
+        const el = document.createElement("div");
+        const key = seatKey(s);
+        let cls = "seat " + s.status;
+        if (state.selected.has(key)) cls += " selected";
+        if (state.editing && seatKey(state.editing) === key) cls += " editing";
+        el.className = cls;
+        el.textContent = s.seat_number;
+        el.title =
+          s.status === "booked"
+            ? `booked by ${s.user_name || s.user_id}`
+            : "free";
+        el.onclick = () => clickSeat(s);
+        return el;
+      }
+
+      function clickSeat(s) {
+        const key = seatKey(s);
+        if (s.status === "free") {
+          state.editing = null; // leave edit mode
+          if (state.selected.has(key)) state.selected.delete(key);
+          else state.selected.add(key);
+        } else {
+          state.selected.clear(); // only one edit at a time
+          state.editing = s;
+        }
+        renderWagon({
+          free: state.seats.filter((x) => x.status === "free").length,
+          total: state.seats.length,
+        });
+        renderSide();
+      }
+
+      function renderSide() {
+        const side = $("side");
+        if (state.editing) return renderEdit(side);
+        return renderBooking(side);
+      }
+
+      // ---- Booking panel (multiple seats) ---------------------------------
+      function renderBooking(side) {
+        const sel = [...state.selected];
+        if (!state.current) {
+          side.innerHTML = `<h2>Booking</h2><p class="empty">Pick a departure first.</p>`;
+          return;
+        }
+        if (!sel.length) {
+          side.innerHTML = `<h2>Booking</h2><p class="empty">Tap free (green) seats to select them. Tap a booked (red) seat to view or edit it.</p>`;
+          return;
+        }
+        side.innerHTML = `
+        <h2>Booking · ${sel.length} seat${sel.length > 1 ? "s" : ""}</h2>
+        <div class="chips">${sel.map((k) => `<span class="chip">${k.split("/")[1]}</span>`).join("")}</div>
+        <label class="field" for="bname">Passenger name</label>
+        <input type="text" id="bname" placeholder="Jan Kowalski" />
+        <label class="field" for="bemail">Email</label>
+        <input type="email" id="bemail" placeholder="jan@example.com" />
+        <button id="acceptBtn">Accept &amp; book ${sel.length} seat${sel.length > 1 ? "s" : ""}</button>
+        <button class="ghost" id="clearBtn">Clear selection</button>
+        <div class="result" id="bresult"></div>`;
+        $("acceptBtn").onclick = book;
+        $("clearBtn").onclick = () => {
+          state.selected.clear();
+          renderWagonFromState();
+          renderSide();
+        };
+      }
+
+      async function book() {
+        const name = $("bname").value.trim();
+        const email = $("bemail").value.trim();
+        const out = $("bresult");
+        if (!name) {
+          out.innerHTML = `<span class="bad">Enter a passenger name.</span>`;
+          return;
+        }
+        $("acceptBtn").disabled = true;
+        const sel = [...state.selected];
+        const lines = [];
+        for (const key of sel) {
+          const [coach, seat] = key.split("/");
+          const r = await api("POST", "/reservations", {
+            departure_id: state.current,
+            coach: +coach,
+            seat_number: seat,
+            user_id: ME,
+            user_name: name,
+            user_email: email,
+            idempotency_key: "ui-" + crypto.randomUUID(),
+          });
+          if (r.status === 201) {
+            lines.push(`<div class="ok">✓ ${seat} booked</div>`);
+            state.selected.delete(key);
+          } else if (r.status === 409) {
+            const h = r.data.detail?.holder;
+            lines.push(
+              `<div class="bad">✗ ${seat} just taken${h ? " by " + (h.user_name || h.user_id) : ""}</div>`,
+            );
+            state.selected.delete(key);
+          } else {
+            lines.push(`<div class="bad">✗ ${seat} error ${r.status}</div>`);
+          }
+        }
+        const inst = (await api("GET", "/health")).data.instance;
+        await loadSeats(); // refreshes the wagon (booked -> red)
+        // Write results into the existing panel — don't re-render the side, or
+        // #bresult would be replaced before we fill it.
+        const res = $("bresult");
+        if (res)
+          res.innerHTML =
+            lines.join("") +
+            `<div class="summary" style="margin-top:.6rem">served by ${inst}</div>`;
+        $("acceptBtn").disabled = false;
+      }
+
+      // ---- Edit panel (one booked seat at a time) -------------------------
+      async function renderEdit(side) {
+        const s = state.editing;
+        // Fresh read so we show the authoritative holder (LOCAL_QUORUM).
+        const r = await api(
+          "GET",
+          `/reservations/${encodeURIComponent(state.current)}/${s.coach}/${s.seat_number}`,
+        );
+        const seat = r.ok ? r.data : s;
+        const mine = seat.user_id === ME;
+        side.innerHTML = `
+        <h2>Seat ${seat.seat_number}</h2>
+        <div class="holder">Held by <b>${seat.user_name || seat.user_id}</b><br>
+          <span class="summary">${seat.user_email || ""}</span></div>
+        ${
+          mine
+            ? `
+          <label class="field" for="ename">Passenger name</label>
+          <input type="text" id="ename" value="${(seat.user_name || "").replace(/"/g, "&quot;")}" />
+          <label class="field" for="eemail">Email</label>
+          <input type="email" id="eemail" value="${(seat.user_email || "").replace(/"/g, "&quot;")}" />
+          <button id="saveBtn">Save changes</button>
+        `
+            : `<p class="empty" style="margin-top:.8rem">This seat is not yours, so it can't be edited.</p>`
+        }
+        <button class="ghost" id="closeEdit">Close</button>
+        <div class="result" id="eresult"></div>`;
+        $("closeEdit").onclick = () => {
+          state.editing = null;
+          renderWagonFromState();
+          renderSide();
+        };
+        if (mine) $("saveBtn").onclick = saveEdit;
+      }
+
+      async function saveEdit() {
+        const s = state.editing;
+        const name = $("ename").value.trim();
+        const email = $("eemail").value.trim();
+        const out = $("eresult");
+        $("saveBtn").disabled = true;
+        const r = await api(
+          "PATCH",
+          `/reservations/${encodeURIComponent(state.current)}/${s.coach}/${s.seat_number}`,
+          { user_id: ME, user_name: name, user_email: email },
+        );
+        if (r.ok) {
+          out.innerHTML = `<span class="ok">✓ Updated.</span>`;
+          await loadSeats();
+        } else {
+          out.innerHTML = `<span class="bad">✗ Error ${r.status}: ${JSON.stringify(r.data.detail || r.data)}</span>`;
+          $("saveBtn").disabled = false;
+        }
+      }
+
+      function renderWagonFromState() {
+        renderWagon({
+          free: state.seats.filter((x) => x.status === "free").length,
+          total: state.seats.length,
+        });
+      }
+
+      init();
+    </script>
+  </body>
+</html>
