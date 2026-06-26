@@ -1,7 +1,4 @@
 -- Keyspace + tables. RF=3, NetworkTopologyStrategy, single DC 'datacenter1'.
--- This DC name MUST match the snitch's DC (CASSANDRA_DC) and the driver's
--- local_dc (CASSANDRA_LOCAL_DC), or queries route to "no local replicas".
-
 CREATE KEYSPACE IF NOT EXISTS train_booking
 WITH replication = {
     'class': 'NetworkTopologyStrategy',
@@ -28,7 +25,7 @@ CREATE TABLE IF NOT EXISTS reservations_by_departure (
     PRIMARY KEY ((departure_id), coach, seat_number)
 );
 
--- Demo stress-test run state. Shared in Cassandra (not a per-instance dict) so a
+-- Demo stress-test run state. Shared in Cassandra so a
 -- poll landing on ANY app instance behind the load balancer sees the same run —
 -- LOCAL_QUORUM write-then-read gives read-after-write. `result` is a JSON blob
 -- ({metrics, verdict} on success, {error} on failure).
